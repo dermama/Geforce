@@ -57,6 +57,10 @@ jobs:
         run: npm install
         working-directory: ./opennow-stable
 
+      - name: Sync Capacitor (generate plugin bridge files)
+        run: npx cap sync android
+        working-directory: ./opennow-stable
+
       - name: Build Android APK (Debug)
         run: |
           cd android
