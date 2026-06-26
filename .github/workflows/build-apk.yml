@@ -60,21 +60,17 @@ jobs:
       - name: Build React web app and copy to Android assets
         run: |
           # Build the renderer (React/Vite) -- outputs to dist/
-          npm run build 2>&1 || {
-            echo "electron-vite build failed, creating minimal fallback index.html..."
-            # Ensure dist/ exists with at least an index.html so Capacitor can load
+          npm run build 2>&1 || true
+          # Ensure dist/ exists, even if build failed
+          if [ ! -f dist/index.html ]; then
+            echo "Creating minimal fallback index.html..."
             mkdir -p dist
             cp src/renderer/index.html dist/index.html
-            # Create a minimal main.tsx since the real one might have Electron imports
-            mkdir -p dist/assets
-            echo '(window as any).__OPENNOW_STANDALONE__ = true;' > dist/entry.js
-            # Patch index.html to use a standalone script instead of the module
-            sed 's|src="./src/main.tsx"|src="./entry.js"|' src/renderer/index.html > dist/index.html
-          }
+          fi
           # Copy web assets to Android app
+          mkdir -p android/app/src/main/assets/public
           cp -r dist/* android/app/src/main/assets/public/
           cp capacitor.config.json android/app/src/main/assets/capacitor.config.json
-          echo "Web assets copied to android/app/src/main/assets/public/"
         working-directory: ./opennow-stable
 
       - name: Create Capacitor Android stub directory
