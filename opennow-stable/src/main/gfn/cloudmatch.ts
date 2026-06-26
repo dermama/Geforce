@@ -332,23 +332,60 @@ function timezoneOffsetMs(): number {
 
 function buildSessionRequestBody(input: SessionCreateRequest): Record<string, unknown> {
   const requestedZoneAddress = input.requestedZoneAddress?.trim() || undefined;
+  const deviceHashId = crypto.randomUUID();
+  const subSessionId = crypto.randomUUID();
 
-  // Minimal body matching the working native Kotlin implementation.
-  // Extra fields (metaData, requestedStreamingFeatures, etc.) were causing the
-  // server to return statusCode 4 (INTERNAL_ERROR) with all fields null/default.
+  // Resolution from user settings (fallback to 1080p@60)
+  const { width, height } = parseResolution(input.settings?.resolution ?? "1920x1080");
+  const fps = input.settings?.fps ?? 60;
+  const hdrEnabled = false; // HDR is negotiated only on claim/resume, not on create
+
+  const timezoneMs = timezoneOffsetMs();
+
   return {
     sessionRequestData: {
       appId: input.appId,
-      clientIdentification: isAndroidPlatform() ? "GFN-ANDROID" : "GFN-PC",
+      internalTitle: input.internalTitle ?? null,
+      deviceHashId,
+      clientIdentification: "GFN-PC",
       clientPlatformName: isAndroidPlatform() ? "android" : "windows",
-      streamerVersion: 1,
       clientVersion: "30.0",
       sdkVersion: "1.0",
+      streamerVersion: 1,
       useOps: true,
       audioMode: 2,
       appLaunchMode: 1,
       accountLinked: input.accountLinked ?? true,
       userAge: 26,
+      sdrHdrMode: hdrEnabled ? 1 : 0,
+      surroundAudioInfo: 0,
+      remoteControllersBitmap: 0,
+      clientTimezoneOffset: timezoneMs,
+      enhancedStreamMode: 1,
+      secureRTSPSupported: false,
+      partnerCustomData: "",
+      enablePersistingInGameSettings: true,
+      availableSupportedControllers: [],
+      networkTestSessionId: null,
+      parentSessionId: null,
+      metaData: [
+        { key: "SubSessionId", value: subSessionId },
+        { key: "wssignaling", value: "1" },
+      ],
+      clientRequestMonitorSettings: [
+        {
+          widthInPixels: width,
+          heightInPixels: height,
+          framesPerSecond: fps,
+          sdrHdrMode: hdrEnabled ? 1 : 0,
+          displayData: {
+            desiredContentMaxLuminance: 0,
+            desiredContentMinLuminance: 0,
+            desiredContentMaxFrameAverageLuminance: 0,
+          },
+          dpi: 0,
+        },
+      ],
       ...(requestedZoneAddress ? { requestedZoneAddress } : {}),
     },
   };
