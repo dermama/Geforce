@@ -286,7 +286,12 @@ function buildSignalingUrl(
 }
 
 function isAndroidPlatform(): boolean {
-  return typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+  // Capacitor injects window.Capacitor in native apps. This is more reliable
+  // than checking navigator.userAgent, which can vary across WebView configs.
+  return typeof window !== "undefined" &&
+    typeof (window as any).Capacitor !== "undefined" &&
+    ((window as any).Capacitor.platform === "android" ||
+     (window as any).Capacitor.isNativePlatform?.());
 }
 
 function requestHeaders(token: string): Record<string, string> {
