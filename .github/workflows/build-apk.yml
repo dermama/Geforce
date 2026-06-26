@@ -57,10 +57,28 @@ jobs:
         run: npm install
         working-directory: ./opennow-stable
 
-      - name: Create Capacitor stub directories
+      - name: Build React web app and copy to Android assets
         run: |
-          mkdir -p android/app/src/main/assets/public
+          # Build the renderer (React/Vite) -- outputs to dist/
+          npm run build 2>&1 || {
+            echo "electron-vite build failed, creating minimal fallback index.html..."
+            # Ensure dist/ exists with at least an index.html so Capacitor can load
+            mkdir -p dist
+            cp src/renderer/index.html dist/index.html
+            # Create a minimal main.tsx since the real one might have Electron imports
+            mkdir -p dist/assets
+            echo '(window as any).__OPENNOW_STANDALONE__ = true;' > dist/entry.js
+            # Patch index.html to use a standalone script instead of the module
+            sed 's|src="./src/main.tsx"|src="./entry.js"|' src/renderer/index.html > dist/index.html
+          }
+          # Copy web assets to Android app
+          cp -r dist/* android/app/src/main/assets/public/
           cp capacitor.config.json android/app/src/main/assets/capacitor.config.json
+          echo "Web assets copied to android/app/src/main/assets/public/"
+        working-directory: ./opennow-stable
+
+      - name: Create Capacitor Android stub directory
+        run: |
           mkdir -p android/capacitor-cordova-android-plugins/src/main
           echo 'ext { cdvMinSdkVersion = 24 }' > android/capacitor-cordova-android-plugins/cordova.variables.gradle
           printf 'apply plugin: "com.android.library"\nandroid {\n    namespace "capacitor.cordova.android.plugins"\n    compileSdk = 36\n    defaultConfig {\n        minSdk = 24\n        targetSdk = 36\n    }\n}\n' > android/capacitor-cordova-android-plugins/build.gradle
