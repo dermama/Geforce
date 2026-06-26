@@ -330,6 +330,15 @@ function timezoneOffsetMs(): number {
   return -new Date().getTimezoneOffset() * 60 * 1000;
 }
 
+function isEnhancedStreamModeEnabled(): boolean {
+  try {
+    if (typeof localStorage !== "undefined") {
+      return localStorage.getItem("opennow:enhancedStream") === "true";
+    }
+  } catch {}
+  return false;
+}
+
 function buildSessionRequestBody(input: SessionCreateRequest): Record<string, unknown> {
   const requestedZoneAddress = input.requestedZoneAddress?.trim() || undefined;
   const deviceHashId = crypto.randomUUID();
@@ -339,8 +348,14 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
   const { width, height } = parseResolution(input.settings?.resolution ?? "1920x1080");
   const fps = input.settings?.fps ?? 60;
   const hdrEnabled = false; // HDR is negotiated only on claim/resume, not on create
+  const enhancedStream = isEnhancedStreamModeEnabled();
 
   const timezoneMs = timezoneOffsetMs();
+
+  // Build streaming features matching what the server needs for instance allocation
+  const chromaFormat = input.settings?.colorQuality
+    ? colorQualityChromaFormat(input.settings.colorQuality)
+    : 0;
 
   return {
     sessionRequestData: {
@@ -349,7 +364,7 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
       deviceHashId,
       clientIdentification: "GFN-PC",
       clientPlatformName: isAndroidPlatform() ? "android" : "windows",
-      clientVersion: "30.0",
+      clientVersion: "2.0.80.173",
       sdkVersion: "1.0",
       streamerVersion: 1,
       useOps: true,
@@ -358,16 +373,28 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
       accountLinked: input.accountLinked ?? true,
       userAge: 26,
       sdrHdrMode: hdrEnabled ? 1 : 0,
+      clientDisplayHdrCapabilities: null,
       surroundAudioInfo: 0,
       remoteControllersBitmap: 0,
       clientTimezoneOffset: timezoneMs,
-      enhancedStreamMode: 1,
+      enhancedStreamMode: enhancedStream ? 1 : 0,
       secureRTSPSupported: false,
       partnerCustomData: "",
       enablePersistingInGameSettings: true,
       availableSupportedControllers: [],
       networkTestSessionId: null,
       parentSessionId: null,
+      requestedStreamingFeatures: {
+        reflex: fps >= 120,
+        bitDepth: 0,
+        cloudGsync: false,
+        enabledL4S: false,
+        profile: 0,
+        fallbackToLogicalResolution: false,
+        chromaFormat,
+        prefilterMode: 0,
+        hudStreamingMode: 0,
+      },
       metaData: [
         { key: "SubSessionId", value: subSessionId },
         { key: "wssignaling", value: "1" },

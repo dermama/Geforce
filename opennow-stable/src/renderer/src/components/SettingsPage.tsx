@@ -1503,6 +1503,25 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
                 </button>
               </div>
             </div>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#ccc" }}>
+                <input
+                  type="checkbox"
+                  checked={localStorage.getItem("opennow:enhancedStream") === "true"}
+                  onChange={(e) => {
+                    localStorage.setItem("opennow:enhancedStream", e.target.checked ? "true" : "false");
+                    // Force re-render
+                    setDebugLogsOpen(false);
+                    setTimeout(() => setDebugLogsOpen(true), 50);
+                  }}
+                  style={{ accentColor: "#5bf" }}
+                />
+                Enhanced Streaming
+              </label>
+              <span style={{ color: "#666", fontSize: 11 }}>
+                {localStorage.getItem("opennow:enhancedStream") === "true" ? "(enabled)" : "(disabled)"}
+              </span>
+            </div>
             <div
               style={{
                 flex: 1, overflowY: "auto", background: "#0d0d1a", borderRadius: 8, padding: 12,
