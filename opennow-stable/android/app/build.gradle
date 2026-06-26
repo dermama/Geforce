@@ -1,6 +1,10 @@
-def keystorePropertiesFile = file("D:\\Projects\\gfnclient\\keystore.properties")
+def keystorePropertiesFile = rootProject.file('keystore.properties')
 def keystoreProperties = new Properties()
-keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else {
+    logger.info("keystore.properties not found. Release signing will be skipped.")
+}
 
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
@@ -20,18 +24,25 @@ android {
         }
     }
     signingConfigs {
-        release {
-            storeFile file(keystoreProperties['RELEASE_STORE_FILE'])
-            storePassword keystoreProperties['RELEASE_STORE_PASSWORD']
-            keyAlias keystoreProperties['RELEASE_KEY_ALIAS']
-            keyPassword keystoreProperties['RELEASE_KEY_PASSWORD']
+        if (keystorePropertiesFile.exists()) {
+            release {
+                storeFile file(keystoreProperties['RELEASE_STORE_FILE'])
+                storePassword keystoreProperties['RELEASE_STORE_PASSWORD']
+                keyAlias keystoreProperties['RELEASE_KEY_ALIAS']
+                keyPassword keystoreProperties['RELEASE_KEY_PASSWORD']
+            }
         }
     }
     buildTypes {
+        debug {
+            debuggable true
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

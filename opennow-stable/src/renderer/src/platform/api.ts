@@ -118,6 +118,21 @@ function buildCapacitorApi(): OpenNowApi {
     claimSession: (input) => claimSession(input as any),
     showSessionConflictDialog: () => callNativePlugin("showSessionConflictDialog"),
 
+    startQueueMonitoring: (input) =>
+      callNativePlugin("startQueueMonitoring", {
+        queuePosition: (input as any)?.queuePosition ?? 0,
+        queueEta: (input as any)?.queueEta ?? 0,
+      }),
+    updateQueueNotification: (input) =>
+      callNativePlugin("updateQueueNotification", {
+        queuePosition: (input as any)?.queuePosition ?? 0,
+        queueEta: (input as any)?.queueEta ?? 0,
+      }),
+    stopQueueMonitoring: () =>
+      callNativePlugin("stopQueueMonitoring"),
+    requestNotificationPermission: () =>
+      callNativePlugin("requestNotificationPermission"),
+
     connectSignaling: async (input) => {
       browserSignaling?.disconnect();
       browserSignaling = new BrowserSignalingClient(

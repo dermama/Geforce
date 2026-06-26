@@ -332,4 +332,13 @@ export interface OpenNowApi {
   getSettings(): Promise<Settings>;
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): Promise<void>;
   resetSettings(): Promise<Settings>;
+
+  /** Start foreground service to monitor queue in background */
+  startQueueMonitoring(input: { queuePosition: number; queueEta: number }): Promise<void>;
+  /** Update queue position notification */
+  updateQueueNotification(input: { queuePosition: number; queueEta: number }): Promise<void>;
+  /** Stop queue monitoring foreground service */
+  stopQueueMonitoring(): Promise<void>;
+  /** Request notification permission (Android 13+) */
+  requestNotificationPermission(): Promise<void>;
 }

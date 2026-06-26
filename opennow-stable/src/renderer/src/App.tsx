@@ -354,6 +354,7 @@ export function App(): JSX.Element {
   const regionsRequestRef = useRef(0);
   const launchInFlightRef = useRef(false);
   const exitPromptResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const queueMonitoringRef = useRef(false);
 
   // Session ref sync
   useEffect(() => {
@@ -1096,6 +1097,24 @@ export function App(): JSX.Element {
         setQueuePosition(polled.queuePosition);
         setQueueEta(polled.queueEta);
 
+        // Foreground queue monitoring (Android only)
+        if (isAndroid()) {
+          const qPos = polled.queuePosition ?? 0;
+          const qEta = polled.queueEta ?? 0;
+          if (qPos > 0) {
+            if (!queueMonitoringRef.current) {
+              queueMonitoringRef.current = true;
+              getPlatformApi().requestNotificationPermission().catch(() => {});
+              getPlatformApi().startQueueMonitoring({ queuePosition: qPos, queueEta: qEta }).catch(() => {});
+            } else {
+              getPlatformApi().updateQueueNotification({ queuePosition: qPos, queueEta: qEta }).catch(() => {});
+            }
+          } else if (queueMonitoringRef.current) {
+            queueMonitoringRef.current = false;
+            getPlatformApi().stopQueueMonitoring().catch(() => {});
+          }
+        }
+
         const wasInQueueMode = isInQueueMode;
         isInQueueMode = (polled.queuePosition ?? 0) >= 1;
         if (wasInQueueMode && !isInQueueMode) {
@@ -1122,6 +1141,11 @@ export function App(): JSX.Element {
         }
       }
 
+      if (queueMonitoringRef.current) {
+        queueMonitoringRef.current = false;
+        getPlatformApi().stopQueueMonitoring().catch(() => {});
+      }
+
       setQueuePosition(undefined);
       setQueueEta(undefined);
       updateLoadingStep("connecting");
@@ -1141,6 +1165,10 @@ export function App(): JSX.Element {
       });
     } catch (error) {
       console.error("Launch failed:", error);
+      if (queueMonitoringRef.current) {
+        queueMonitoringRef.current = false;
+        getPlatformApi().stopQueueMonitoring().catch(() => {});
+      }
       setLaunchError(toLaunchErrorState(error, loadingStep));
       await getPlatformApi().disconnectSignaling().catch(() => {});
       clientRef.current?.dispose();
@@ -1226,6 +1254,10 @@ export function App(): JSX.Element {
   // Stop stream handler
   const handleStopStream = useCallback(async () => {
     try {
+      if (queueMonitoringRef.current) {
+        queueMonitoringRef.current = false;
+        getPlatformApi().stopQueueMonitoring().catch(() => {});
+      }
       resolveExitPrompt(false);
       await getPlatformApi().disconnectSignaling();
 
@@ -1262,6 +1294,10 @@ export function App(): JSX.Element {
   }, [authSession, refreshNavbarActiveSession, resolveExitPrompt]);
 
   const handleDismissLaunchError = useCallback(async () => {
+    if (queueMonitoringRef.current) {
+      queueMonitoringRef.current = false;
+      getPlatformApi().stopQueueMonitoring().catch(() => {});
+    }
     await getPlatformApi().disconnectSignaling().catch(() => {});
     clientRef.current?.dispose();
     clientRef.current = null;

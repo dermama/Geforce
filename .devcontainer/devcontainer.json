@@ -1,0 +1,36 @@
+{
+  "name": "OpenNOW Android Dev",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installGradle": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/android-sdk:1": {
+      "buildToolsVersion": "36",
+      "platformsVersion": "36",
+      "cmdlineToolsVersion": "12.0"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "mathiasfrohlich.Kotlin",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "postCreateCommand": "cd opennow-stable && npm install && echo 'Ready! Run: cd opennow-stable/android && ./gradlew assembleDebug'",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Dev Server",
+      "onAutoForward": "notify"
+    }
+  }
+}

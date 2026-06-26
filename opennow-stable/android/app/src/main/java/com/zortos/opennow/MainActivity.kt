@@ -1,8 +1,11 @@
 package com.zortos.opennow
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.core.view.WindowCompat
@@ -12,6 +15,7 @@ class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         registerPlugin(GfnPlugin::class.java)
         super.onCreate(savedInstanceState)
+        createNotificationChannel()
         // Draw edge-to-edge so the WebView fills under system bars.
         // CSS then uses env(safe-area-inset-*) to avoid overlap.
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -40,6 +44,21 @@ class MainActivity : BridgeActivity() {
         if (uri.scheme == "opennow" && uri.host == "auth" && uri.getQueryParameter("code") != null) {
             val plugin = bridge.getPlugin("GfnPlugin")?.getInstance() as? GfnPlugin
             plugin?.handleOAuthRedirect(uri)
+        }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                QueueForegroundService.CHANNEL_ID,
+                "GFN Queue Monitor",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows your position in the GeForce NOW queue"
+                setShowBadge(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
         }
     }
 }

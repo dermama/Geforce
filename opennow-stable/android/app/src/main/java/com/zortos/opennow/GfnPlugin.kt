@@ -1176,4 +1176,68 @@ class GfnPlugin : Plugin() {
             builder.show()
         }
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // Queue Monitoring (Foreground Service)
+    // ──────────────────────────────────────────────────────────────
+
+    @PluginMethod
+    fun startQueueMonitoring(call: PluginCall) {
+        val position = call.getInt("queuePosition", 0)
+        val eta = call.getInt("queueEta", 0)
+        try {
+            QueueForegroundService.start(activity, position, eta)
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("startQueueMonitoring failed: ${e.message}")
+        }
+    }
+
+    @PluginMethod
+    fun updateQueueNotification(call: PluginCall) {
+        val position = call.getInt("queuePosition", 0)
+        val eta = call.getInt("queueEta", 0)
+        try {
+            QueueForegroundService.update(activity, position, eta)
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("updateQueueNotification failed: ${e.message}")
+        }
+    }
+
+    @PluginMethod
+    fun stopQueueMonitoring(call: PluginCall) {
+        try {
+            QueueForegroundService.stop(activity)
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("stopQueueMonitoring failed: ${e.message}")
+        }
+    }
+
+    @PluginMethod
+    fun requestNotificationPermission(call: PluginCall) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            activity.runOnUiThread {
+                val builder = android.app.AlertDialog.Builder(activity)
+                builder.setTitle("Notification Permission")
+                builder.setMessage("Allow notifications to see your queue position when the app is in the background.")
+                builder.setPositiveButton("Allow") { _, _ ->
+                    try {
+                        val intent = android.content.Intent(
+                            android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                        ).apply {
+                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, activity.packageName)
+                        }
+                        activity.startActivity(intent)
+                    } catch (_: Exception) {}
+                    call.resolve()
+                }
+                builder.setNegativeButton("Not Now") { _, _ -> call.resolve() }
+                builder.show()
+            }
+        } else {
+            call.resolve()
+        }
+    }
 }
