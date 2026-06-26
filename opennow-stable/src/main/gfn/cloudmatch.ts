@@ -330,99 +330,26 @@ function timezoneOffsetMs(): number {
   return -new Date().getTimezoneOffset() * 60 * 1000;
 }
 
-function buildSessionRequestBody(input: SessionCreateRequest): CloudMatchRequest {
-  const { width, height } = parseResolution(input.settings.resolution);
+function buildSessionRequestBody(input: SessionCreateRequest): Record<string, unknown> {
   const requestedZoneAddress = input.requestedZoneAddress?.trim() || undefined;
-  const cq = input.settings.colorQuality;
-  // IMPORTANT: hdrEnabled is a SEPARATE toggle from color quality.
-  // The Rust reference (cloudmatch.rs) uses settings.hdr_enabled independently.
-  // 10-bit color depth does NOT mean HDR — you can have 10-bit SDR.
-  // Conflating them caused the server to set up an HDR pipeline, which
-  // dynamically downscaled resolution to ~540p.
-  const hdrEnabled = false; // No HDR toggle implemented yet; hardcode off like claim body
-  const bitDepth = colorQualityBitDepth(cq);
-  const chromaFormat = colorQualityChromaFormat(cq);
-  const accountLinked = input.accountLinked ?? true;
 
+  // Minimal body matching the working native Kotlin implementation.
+  // Extra fields (metaData, requestedStreamingFeatures, etc.) were causing the
+  // server to return statusCode 4 (INTERNAL_ERROR) with all fields null/default.
   return {
     sessionRequestData: {
       appId: input.appId,
-      internalTitle: input.internalTitle || null,
-      availableSupportedControllers: [],
-      networkTestSessionId: null,
-      parentSessionId: null,
       clientIdentification: isAndroidPlatform() ? "GFN-ANDROID" : "GFN-PC",
-      deviceHashId: crypto.randomUUID(),
+      clientPlatformName: isAndroidPlatform() ? "android" : "windows",
+      streamerVersion: 1,
       clientVersion: "30.0",
       sdkVersion: "1.0",
-      streamerVersion: 1,
-      clientPlatformName: isAndroidPlatform() ? "android" : "windows",
-      clientRequestMonitorSettings: [
-        {
-          widthInPixels: width,
-          heightInPixels: height,
-          framesPerSecond: input.settings.fps,
-          sdrHdrMode: hdrEnabled ? 1 : 0,
-          displayData: {
-            desiredContentMaxLuminance: hdrEnabled ? 1000 : 0,
-            desiredContentMinLuminance: 0,
-            desiredContentMaxFrameAverageLuminance: hdrEnabled ? 500 : 0,
-          },
-          dpi: 100,
-        },
-      ],
       useOps: true,
       audioMode: 2,
-      metaData: [
-        { key: "SubSessionId", value: crypto.randomUUID() },
-        { key: "wssignaling", value: "1" },
-        { key: "GSStreamerType", value: "WebRTC" },
-        { key: "networkType", value: "Unknown" },
-        { key: "ClientImeSupport", value: "0" },
-        {
-          key: "clientPhysicalResolution",
-          value: JSON.stringify({ horizontalPixels: width, verticalPixels: height }),
-        },
-        { key: "surroundAudioInfo", value: "2" },
-      ],
-      sdrHdrMode: hdrEnabled ? 1 : 0,
-      clientDisplayHdrCapabilities: hdrEnabled
-        ? {
-            version: 1,
-            hdrEdrSupportedFlagsInUint32: 1,
-            staticMetadataDescriptorId: 0,
-          }
-        : null,
-      surroundAudioInfo: 0,
-      remoteControllersBitmap: 0,
-      clientTimezoneOffset: timezoneOffsetMs(),
-      enhancedStreamMode: 1,
       appLaunchMode: 1,
-      secureRTSPSupported: false,
-      partnerCustomData: "",
-      accountLinked,
-      enablePersistingInGameSettings: true,
+      accountLinked: input.accountLinked ?? true,
       userAge: 26,
       ...(requestedZoneAddress ? { requestedZoneAddress } : {}),
-      requestedStreamingFeatures: {
-        reflex: input.settings.fps >= 120,
-        bitDepth,
-        cloudGsync: false,
-        enabledL4S: false,
-        mouseMovementFlags: 0,
-        trueHdr: hdrEnabled,
-        supportedHidDevices: 0,
-        profile: 0,
-        fallbackToLogicalResolution: false,
-        hidDevices: null,
-        chromaFormat,
-        prefilterMode: 0,
-        prefilterSharpness: 0,
-        prefilterNoiseReduction: 0,
-        hudStreamingMode: 0,
-        sdrColorSpace: 2,
-        hdrColorSpace: hdrEnabled ? 4 : 0,
-      },
     },
   };
 }
@@ -581,7 +508,7 @@ export async function createSession(input: SessionCreateRequest): Promise<Sessio
     appId: input.appId,
     url: `${resolveStreamingBaseUrl(input.zone, input.streamingBaseUrl)}/v2/session`,
     headers: safeHeaders(headers),
-    bodyKeys: Object.keys(body.sessionRequestData),
+    body: body,
   });
 
   const base = resolveStreamingBaseUrl(input.zone, input.streamingBaseUrl);
