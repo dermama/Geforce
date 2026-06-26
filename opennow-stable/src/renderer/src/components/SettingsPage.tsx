@@ -1,4 +1,4 @@
-import { Globe, Save, Check, Search, X, Loader, Zap, Mic, User, LogOut } from "lucide-react";
+import { Globe, Save, Check, Search, X, Loader, Zap, Mic, User, LogOut, Bug, Copy, Trash2 } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { JSX } from "react";
 
@@ -15,6 +15,7 @@ import type {
 } from "@shared/gfn";
 import { colorQualityRequiresHevc } from "@shared/gfn";
 import { formatShortcutForDisplay, normalizeShortcut } from "../shortcuts";
+import { getLogs, clearLogs, exportLogs } from "@shared/debugLog";
 
 interface SettingsPageProps {
   settings: Settings;
@@ -455,6 +456,8 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
   const [codecResults, setCodecResults] = useState<CodecTestResult[] | null>(initialCodecResults);
   const [codecTesting, setCodecTesting] = useState(false);
   const [codecTestOpen, setCodecTestOpen] = useState(() => initialCodecResults !== null);
+  const [debugLogsOpen, setDebugLogsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const platformHardwareLabel = useMemo(() => {
     const platform = navigator.platform.toLowerCase();
     if (platform.includes("win")) return "D3D11 / DXVA";
@@ -1435,7 +1438,104 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
           <Save size={16} />
           Save Settings
         </button>
+        <button
+          className="settings-save-btn"
+          style={{ background: "#334", marginLeft: 8 }}
+          onClick={() => setDebugLogsOpen(true)}
+          type="button"
+        >
+          <Bug size={16} />
+          Debug Logs
+        </button>
       </div>
+
+      {/* Debug Logs Modal */}
+      {debugLogsOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => setDebugLogsOpen(false)}
+        >
+          <div
+            style={{
+              background: "#1a1a2e", borderRadius: 12, padding: 20,
+              width: "100%", maxWidth: 700, maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+              color: "#eee", fontSize: 13, fontFamily: "monospace",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <Bug size={16} /> Debug Logs
+              </h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(exportLogs());
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  style={{ background: "#334", border: "none", color: "#eee", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}
+                  type="button"
+                >
+                  <Copy size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  {copied ? "Copied!" : "Copy All"}
+                </button>
+                <button
+                  onClick={() => { clearLogs(); }}
+                  style={{ background: "#533", border: "none", color: "#eee", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12 }}
+                  type="button"
+                >
+                  <Trash2 size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  Clear
+                </button>
+                <button
+                  onClick={() => setDebugLogsOpen(false)}
+                  style={{ background: "transparent", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer", padding: "0 8px" }}
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                flex: 1, overflowY: "auto", background: "#0d0d1a", borderRadius: 8, padding: 12,
+                whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.5,
+                maxHeight: "70vh", fontSize: 12,
+              }}
+            >
+              {getLogs().length === 0 ? (
+                <span style={{ color: "#666" }}>No logs yet. Try playing a game first.</span>
+              ) : (
+                getLogs().map((entry, i) => {
+                  const time = entry.timestamp.slice(11, 23);
+                  const colors: Record<string, string> = { error: "#f55", warn: "#fa0", info: "#5bf", debug: "#888" };
+                  const icon = entry.level === "error" ? "✗" : entry.level === "warn" ? "⚠" : entry.level === "info" ? "ℹ" : "·";
+                  return (
+                    <div key={i} style={{ marginBottom: 4, color: colors[entry.level] ?? "#ccc" }}>
+                      <span style={{ color: "#666" }}>[{time}]</span>{" "}
+                      <span style={{ color: colors[entry.level] }}>{icon}</span>{" "}
+                      <span style={{ color: "#999" }}>[{entry.source}]</span>{" "}
+                      {entry.message}
+                      {entry.data && (
+                        <pre style={{ margin: "4px 0 0 16px", fontSize: 11, color: "#888", whiteSpace: "pre-wrap" }}>
+                          {JSON.stringify(entry.data, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

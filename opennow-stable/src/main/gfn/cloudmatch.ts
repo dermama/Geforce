@@ -20,6 +20,7 @@ import type { CloudMatchRequest, CloudMatchResponse, GetSessionsResponse } from 
 import { SessionError } from "./errorCodes";
 
 import { buildDeviceHeaders } from "@shared/deviceHeaders";
+import { log } from "@shared/debugLog";
 
 const GFN_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 NVIDIACEFClient/HEAD/debb5919f6 GFN-PC/2.0.80.173";
@@ -283,6 +284,18 @@ function buildSignalingUrl(
     signalingUrl: `wss://${serverIp}:443/nvst/`,
     signalingHost: null,
   };
+}
+
+function safeHeaders(headers: Record<string, string>): Record<string, string> {
+  const safe: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === "authorization") {
+      safe[k] = v.slice(0, 20) + "...";
+    } else {
+      safe[k] = v;
+    }
+  }
+  return safe;
 }
 
 function isAndroidPlatform(): boolean {
@@ -560,25 +573,36 @@ export async function createSession(input: SessionCreateRequest): Promise<Sessio
   }
 
   const body = buildSessionRequestBody(input);
-  console.log("[DEBUG] session request body:", JSON.stringify(body, null, 2));
+  const headers = requestHeaders(input.token);
+
+  log("info", "createSession", "Sending request", {
+    zone: input.zone,
+    streamingBaseUrl: input.streamingBaseUrl,
+    appId: input.appId,
+    url: `${resolveStreamingBaseUrl(input.zone, input.streamingBaseUrl)}/v2/session`,
+    headers: safeHeaders(headers),
+    bodyKeys: Object.keys(body.sessionRequestData),
+  });
 
   const base = resolveStreamingBaseUrl(input.zone, input.streamingBaseUrl);
   const url = `${base}/v2/session?keyboardLayout=en-US&languageCode=en_US`;
   const response = await fetch(url, {
     method: "POST",
-    headers: requestHeaders(input.token),
+    headers,
     body: JSON.stringify(body),
   });
 
   const text = await response.text();
+  log("info", "createSession", `Response: HTTP ${response.status}`, {
+    status: response.status,
+    bodyPreview: text.slice(0, 2000),
+  });
+
   if (!response.ok) {
-    // Use SessionError to parse and throw detailed error
     throw SessionError.fromResponse(response.status, text);
   }
 
   const payload = JSON.parse(text) as CloudMatchResponse;
-  // Log full raw response so we can see if server returned serverId, assignedZone, etc.
-  console.log("[DEBUG] createSession raw response:", JSON.stringify(payload, null, 2));
   return toSessionInfo(input.zone, base, payload);
 }
 
@@ -590,12 +614,23 @@ export async function pollSession(input: SessionPollRequest): Promise<SessionInf
   const base = resolvePollStopBase(input.zone, input.streamingBaseUrl, input.serverIp);
   const url = `${base}/v2/session/${input.sessionId}`;
   const headers = requestHeaders(input.token);
+  log("debug", "pollSession", `Polling session ${input.sessionId}`, {
+    url,
+    serverIp: input.serverIp,
+    headers: safeHeaders(headers),
+  });
+
   const response = await fetch(url, {
     method: "GET",
     headers,
   });
 
   const text = await response.text();
+  log("debug", "pollSession", `Response: HTTP ${response.status}`, {
+    status: response.status,
+    bodyPreview: text.slice(0, 1000),
+  });
+
   if (!response.ok) {
     throw SessionError.fromResponse(response.status, text);
   }
@@ -621,10 +656,7 @@ export async function pollSession(input: SessionPollRequest): Promise<SessionInf
   }
 
   if (polledViaZone && realIpDiffers && (payload.session.status === 2 || payload.session.status === 3)) {
-    // Session is ready and we now know the real server IP — re-poll directly
-    console.log(
-      `[CloudMatch] Session ready: re-polling via real server IP ${realServerIp} (was: ${new URL(base).hostname})`,
-    );
+    log("debug", "pollSession", `Re-polling via real server IP ${realServerIp}`);
     const directBase = `https://${realServerIp}`;
     const directUrl = `${directBase}/v2/session/${input.sessionId}`;
     try {
@@ -636,13 +668,12 @@ export async function pollSession(input: SessionPollRequest): Promise<SessionInf
         const directText = await directResponse.text();
         const directPayload = JSON.parse(directText) as CloudMatchResponse;
         if (directPayload.requestStatus.statusCode === 1) {
-          console.log("[CloudMatch] Direct re-poll succeeded, using direct response for signaling info");
+          log("debug", "pollSession", "Direct re-poll succeeded");
           return toSessionInfo(input.zone, directBase, directPayload);
         }
       }
     } catch (e) {
-      // Direct poll failed — fall through to use the original zone LB response
-      console.warn("[CloudMatch] Direct re-poll failed, using zone LB response:", e);
+      log("warn", "pollSession", "Direct re-poll failed, using zone LB response", { error: String(e) });
     }
   }
 
@@ -656,14 +687,19 @@ export async function stopSession(input: SessionStopRequest): Promise<void> {
 
   const base = resolvePollStopBase(input.zone, input.streamingBaseUrl, input.serverIp);
   const url = `${base}/v2/session/${input.sessionId}`;
+  const headers = requestHeaders(input.token);
+  log("info", "stopSession", `Stopping session ${input.sessionId}`, { url });
+
   const response = await fetch(url, {
     method: "DELETE",
-    headers: requestHeaders(input.token),
+    headers,
   });
 
   if (!response.ok) {
     const text = await response.text();
-    // Use SessionError to parse and throw detailed error
+    log("warn", "stopSession", `Stop failed HTTP ${response.status}`, {
+      body: text.slice(0, 500),
+    });
     throw SessionError.fromResponse(response.status, text);
   }
 }
@@ -690,6 +726,11 @@ export async function getActiveSessions(
 
   const headers = buildDeviceHeaders(token, clientId, deviceId, isAndroidPlatform());
 
+  log("debug", "getActiveSessions", "Fetching active sessions", {
+    url,
+    headers: safeHeaders(headers),
+  });
+
   const response = await fetch(url, {
     method: "GET",
     headers,
@@ -698,8 +739,9 @@ export async function getActiveSessions(
   const text = await response.text();
 
   if (!response.ok) {
-    // Return empty list on failure (matching Rust behavior)
-    console.warn(`Get sessions failed: ${response.status} - ${text.slice(0, 200)}`);
+    log("warn", "getActiveSessions", `Failed HTTP ${response.status}`, {
+      body: text.slice(0, 500),
+    });
     return [];
   }
 
@@ -707,6 +749,9 @@ export async function getActiveSessions(
   try {
     sessionsResponse = JSON.parse(text) as GetSessionsResponse;
   } catch {
+    log("warn", "getActiveSessions", "Failed to parse response JSON", {
+      preview: text.slice(0, 500),
+    });
     return [];
   }
 
@@ -886,7 +931,12 @@ export async function claimSession(input: SessionClaimRequest): Promise<SessionI
   const payload = buildClaimRequestBody(input.sessionId, appId, settings);
   const headers = buildDeviceHeaders(input.token, clientId, deviceId, isAndroidPlatform());
 
-  // Send claim request
+  log("info", "claimSession", `Claiming session ${input.sessionId}`, {
+    url: claimUrl,
+    serverIp: input.serverIp,
+    headers: safeHeaders(headers),
+  });
+
   const response = await fetch(claimUrl, {
     method: "PUT",
     headers,
@@ -894,6 +944,10 @@ export async function claimSession(input: SessionClaimRequest): Promise<SessionI
   });
 
   const text = await response.text();
+  log("info", "claimSession", `Claim response HTTP ${response.status}`, {
+    status: response.status,
+    bodyPreview: text.slice(0, 2000),
+  });
 
   if (!response.ok) {
     throw SessionError.fromResponse(response.status, text);
@@ -919,12 +973,14 @@ export async function claimSession(input: SessionClaimRequest): Promise<SessionI
     delete pollHeaders["Origin"];
     delete pollHeaders["Referer"];
 
+    log("debug", "claimSession", `Poll attempt ${attempt}/${maxAttempts}`, { url: getUrl });
     const pollResponse = await fetch(getUrl, {
       method: "GET",
       headers: pollHeaders,
     });
 
     if (!pollResponse.ok) {
+      log("debug", "claimSession", `Poll attempt ${attempt} failed HTTP ${pollResponse.status}`);
       continue;
     }
 
