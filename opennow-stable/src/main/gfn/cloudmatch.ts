@@ -352,11 +352,6 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
 
   const timezoneMs = timezoneOffsetMs();
 
-  // Build streaming features matching what the server needs for instance allocation
-  const chromaFormat = input.settings?.colorQuality
-    ? colorQualityChromaFormat(input.settings.colorQuality)
-    : 0;
-
   return {
     sessionRequestData: {
       appId: input.appId,
@@ -364,7 +359,7 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
       deviceHashId,
       clientIdentification: "GFN-PC",
       clientPlatformName: isAndroidPlatform() ? "android" : "windows",
-      clientVersion: "2.0.80.173",
+      clientVersion: "30.0",
       sdkVersion: "1.0",
       streamerVersion: 1,
       useOps: true,
@@ -373,7 +368,6 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
       accountLinked: input.accountLinked ?? true,
       userAge: 26,
       sdrHdrMode: hdrEnabled ? 1 : 0,
-      clientDisplayHdrCapabilities: null,
       surroundAudioInfo: 0,
       remoteControllersBitmap: 0,
       clientTimezoneOffset: timezoneMs,
@@ -384,17 +378,6 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
       availableSupportedControllers: [],
       networkTestSessionId: null,
       parentSessionId: null,
-      requestedStreamingFeatures: {
-        reflex: fps >= 120,
-        bitDepth: 0,
-        cloudGsync: false,
-        enabledL4S: false,
-        profile: 0,
-        fallbackToLogicalResolution: false,
-        chromaFormat,
-        prefilterMode: 0,
-        hudStreamingMode: 0,
-      },
       metaData: [
         { key: "SubSessionId", value: subSessionId },
         { key: "wssignaling", value: "1" },
