@@ -285,11 +285,15 @@ function buildSignalingUrl(
   };
 }
 
+function isAndroidPlatform(): boolean {
+  return typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+}
+
 function requestHeaders(token: string): Record<string, string> {
   const clientId = crypto.randomUUID();
   const deviceId = crypto.randomUUID();
   // Use the shared device header builder so Android and desktop stay in sync.
-  return buildDeviceHeaders(token, clientId, deviceId, false);
+  return buildDeviceHeaders(token, clientId, deviceId, isAndroidPlatform());
 }
 
 function parseResolution(input: string): { width: number; height: number } {
@@ -329,12 +333,12 @@ function buildSessionRequestBody(input: SessionCreateRequest): CloudMatchRequest
       availableSupportedControllers: [],
       networkTestSessionId: null,
       parentSessionId: null,
-      clientIdentification: "GFN-PC",
+      clientIdentification: isAndroidPlatform() ? "GFN-ANDROID" : "GFN-PC",
       deviceHashId: crypto.randomUUID(),
       clientVersion: "30.0",
       sdkVersion: "1.0",
       streamerVersion: 1,
-      clientPlatformName: "windows",
+      clientPlatformName: isAndroidPlatform() ? "android" : "windows",
       clientRequestMonitorSettings: [
         {
           widthInPixels: width,
@@ -679,7 +683,7 @@ export async function getActiveSessions(
     : streamingBaseUrl.trim();
   const url = `${base}/v2/session`;
 
-  const headers = buildDeviceHeaders(token, clientId, deviceId, false);
+  const headers = buildDeviceHeaders(token, clientId, deviceId, isAndroidPlatform());
 
   const response = await fetch(url, {
     method: "GET",
@@ -791,7 +795,7 @@ function buildClaimRequestBody(sessionId: string, appId: string, settings: Strea
       clientVersion: "30.0",
       deviceHashId: deviceId,
       internalTitle: null,
-      clientPlatformName: "windows",
+      clientPlatformName: isAndroidPlatform() ? "android" : "windows",
       metaData: [
         { key: "SubSessionId", value: subSessionId },
         { key: "wssignaling", value: "1" },
@@ -806,7 +810,7 @@ function buildClaimRequestBody(sessionId: string, appId: string, settings: Strea
       ],
       surroundAudioInfo: 0,
       clientTimezoneOffset: timezoneMs,
-      clientIdentification: "GFN-PC",
+      clientIdentification: isAndroidPlatform() ? "GFN-ANDROID" : "GFN-PC",
       parentSessionId: null,
       appId,
       streamerVersion: 1,
@@ -875,7 +879,7 @@ export async function claimSession(input: SessionClaimRequest): Promise<SessionI
   };
 
   const payload = buildClaimRequestBody(input.sessionId, appId, settings);
-  const headers = buildDeviceHeaders(input.token, clientId, deviceId, false);
+  const headers = buildDeviceHeaders(input.token, clientId, deviceId, isAndroidPlatform());
 
   // Send claim request
   const response = await fetch(claimUrl, {
