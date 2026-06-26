@@ -22,6 +22,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
+import android.os.Build
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
@@ -1183,8 +1184,8 @@ class GfnPlugin : Plugin() {
 
     @PluginMethod
     fun startQueueMonitoring(call: PluginCall) {
-        val position = call.getInt("queuePosition", 0)
-        val eta = call.getInt("queueEta", 0)
+        val position = (call.getInt("queuePosition") ?: 0)
+        val eta = (call.getInt("queueEta") ?: 0)
         try {
             QueueForegroundService.start(activity, position, eta)
             call.resolve()
@@ -1195,8 +1196,8 @@ class GfnPlugin : Plugin() {
 
     @PluginMethod
     fun updateQueueNotification(call: PluginCall) {
-        val position = call.getInt("queuePosition", 0)
-        val eta = call.getInt("queueEta", 0)
+        val position = (call.getInt("queuePosition") ?: 0)
+        val eta = (call.getInt("queueEta") ?: 0)
         try {
             QueueForegroundService.update(activity, position, eta)
             call.resolve()
