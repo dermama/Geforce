@@ -378,6 +378,27 @@ function buildSessionRequestBody(input: SessionCreateRequest): Record<string, un
       availableSupportedControllers: [],
       networkTestSessionId: null,
       parentSessionId: null,
+      requestedStreamingFeatures: {
+        reflex: fps >= 120,
+        bitDepth: colorQualityBitDepth(input.settings?.colorQuality ?? "8bit_420"),
+        cloudGsync: false,
+        enabledL4S: false,
+        mouseMovementFlags: 0,
+        trueHdr: false,
+        supportedHidDevices: 0,
+        profile: 0,
+        fallbackToLogicalResolution: false,
+        hidDevices: null,
+        chromaFormat: input.settings?.colorQuality
+          ? colorQualityChromaFormat(input.settings.colorQuality)
+          : 0,
+        prefilterMode: 0,
+        prefilterSharpness: 0,
+        prefilterNoiseReduction: 0,
+        hudStreamingMode: 0,
+        sdrColorSpace: 0,
+        hdrColorSpace: 0,
+      },
       metaData: [
         { key: "SubSessionId", value: subSessionId },
         { key: "wssignaling", value: "1" },
